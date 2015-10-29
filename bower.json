@@ -6,7 +6,7 @@
   "authors": [
     "Christian Meichsner <christian.meichsner@live.com>"
   ],
-  "description": "A small decorator for the JavaScript WebSocket API that automatically reconnects",
+  "description": "Holy javascript client/server communication over websockets (sync/async/timed/publish/subscribed/multichan) — Edit",
   "moduleType": [
     "amd",
     "globals",
