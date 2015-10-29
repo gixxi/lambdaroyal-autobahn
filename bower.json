@@ -1,0 +1,23 @@
+{
+  "name": "lambdaroyal-autobahn",
+  "main": "lambdaroyal-autobahn.js",
+  "version": "0.1",
+  "homepage": "https://github.com/gixxi/lambdaroyal-autobahn",
+  "authors": [
+    "Christian Meichsner <christian.meichsner@live.com>"
+  ],
+  "description": "A small decorator for the JavaScript WebSocket API that automatically reconnects",
+  "moduleType": [
+    "amd",
+    "globals",
+    "node"
+  ],
+  "license": "GPLv3",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ]
+}
