@@ -78,7 +78,7 @@
       protocols: "vlic",
       /**gets called when the global state changes*/
       stateCallback: function(state) {
-        console.log("[autobahn] transiate to state " + state);
+        console.log("[autobahn " + this.sessionId + "] transiate to state " + state);
       }
     }
     if (!options) { options = {}; }
@@ -242,10 +242,10 @@
     this.mtnTimer = setInterval(this.mtn.bind(this), this.maintainanceInterval);
 
     this.close = function() {
-      this.mtnTimer = clearInterval(mtnTimer);
+      clearInterval(this.mtnTimer);
       //keep those that are connected
       this.websockets = this.websockets.filter(function(n) {
-        return n.state() === WebSocket.CONNECTING | n.state() === WebSocket.OPEN;
+        return n.readyState === n.readyState === WebSocket.OPEN;
       });
 
       this.websockets.map(function(n) {
