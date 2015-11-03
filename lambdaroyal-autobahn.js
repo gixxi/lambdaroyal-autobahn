@@ -12,6 +12,11 @@
   //  return;
   //}
 
+
+  ///////////////////////////////////////////////////////////////
+  // helper functions
+  ///////////////////////////////////////////////////////////////
+
   var makeid = function() {
     var xs = [];
     var def = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -51,6 +56,54 @@
     return prop;
   };
   
+  //////////////////////////////////////////////////////////////
+  // easy message bus
+  //////////////////////////////////////////////////////////////
+  var Mbus = function() {
+    //maps topics to function wrappers
+    this.topics = new Map();
+
+    /** returns a unique identifier for this observer related to the topic.
+        use this identifier to unsubscribe from the topic */
+    this.sub = function(topic, λ) {
+      var observers = this.topics.get(topic);
+      if(observers === undefined) {
+        observers = new Map();
+        this.topics.set(topic, observers);
+      }
+
+      var λid = _id();
+      observers.set(λid, λ);
+      return λid;
+    }
+
+    /** desubscribe from a topic, λid denotes the unique identifier of the observer */
+    this.desub = function(topic, λid) {
+      var observers = this.topics.get(topic);
+      if(observers !== undefined) {
+        observers.delete(λid);
+        if(observers.size == 0) {
+          this.topics.delete(topic);
+        }
+      }
+    }
+
+    /** notify all observers of a certain topic on the msg */
+    this.pub = function(topic, msg) {
+      var observers = this.topics.get(topic);
+      if(observers !== undefined) {
+        for(var x of observers.values()) {
+          try {
+            x(msg);
+          } catch(e) {}
+        }
+      }
+    }
+  }
+
+  //////////////////////////////////////////////////////////////
+  // the one and only
+  //////////////////////////////////////////////////////////////
 
   var Autobahn = function(url, options) {
     // Default settings
@@ -93,6 +146,11 @@
     }
 
     // these should be treated as read-only properties
+
+    /**
+     * message bus for fan-out messaging
+     */
+    this.mbus = new Mbus();
 
     /** The URL as resolved by the constructor. This is always an absolute URL. Read only. */
     this.url = url;
@@ -151,6 +209,23 @@
       }
       return false;
     };
+    
+    /** checks whether the incoming data contains a topic, notifies all subscribing observers */
+    this.pub = function(evt) {
+      if(evt.data !== undefined) {
+        var data = evt.data;
+        
+        if(data && typeof data === "string") {
+          data = JSON.parse(data);
+        }
+        var topic = data["topic"];
+        if(topic !== undefined) {
+          this.mbus.pub(topic, data);
+          return true;
+        }
+      }
+      return false      
+    }
 
     this.timeoutPromise = function(lease) {
       var promise = this.promises.get(lease);
@@ -178,7 +253,7 @@
 
     this.oncloseWebsocket = function(ws, evt) {
       if(this.debug) {
-        console.log("[autobahn] receive close on websocket: " + evt);
+        console.log("[autobahn " + this.sessionId + "] receive close on websocket: " + evt);
       }
       if(this.websockets.filter(function(n) {
         return n.readyState === WebSocket.CONNECTING | n.readyState === WebSocket.OPEN;
@@ -196,10 +271,13 @@
     }
     this.onmessageWebsocket = function(ws, evt) {
       if(this.debug) {
-        console.log("[autobahn] receive message on websocket: " + evt);
+        console.log("[autobahn " + this.sessionId + "] receive message on websocket: " + evt);
       }
+      // -> chain of responsibility
+      //do some sync stuff
       if(!this.resolvePromise(evt)) {
         //do some async stuff
+        this.pub(evt);
       }
     }
 
@@ -208,7 +286,7 @@
       if(this.state() === States.OUTOFSERVICE) this.state(States.CLOSED);
       try {
         if(this.debug) {
-          console.log("[autobahn] init websocket to " + this.url);
+          console.log("[autobahn " + this.sessionId + "] init websocket to " + this.url);
         }
         var ws = new WebSocket(this.url);
         this.registerWebsocket(ws);
@@ -271,18 +349,55 @@
       var promise = new Promise(function(resolve, reject) {
         //fail fast
         if(autobahn.state() == autobahn.States.CLOSED) {
-          this.reject(Error("failed to send data in sync mode - autobahn is closed."));
-          return;
+          reject(Error("failed to send data in sync mode - autobahn is closed."));
+        } else {
+          //register the promise
+          autobahn.promises.set(lease, {resolve: resolve, reject: reject});
         }
 
-        //register the promise
-        autobahn.promises.set(lease, {resolve: resolve, reject: reject});
 
       });
 
       var promiseWrapper = this.promises.get(lease);
-      promiseWrapper.promise = promise;
-      
+      if(promiseWrapper) {
+
+        promiseWrapper.promise = promise;
+        
+
+        //get some ws
+        var xs = this.websockets.filter(function(x) {
+          return x.readyState == WebSocket.OPEN;
+        });
+        if(xs.length == 0) {
+          this.promises.delete(lease);
+          promise.reject(Error("failed to send data in sync mode - autobahn is closed."));
+        }
+        var ws = xs[Math.floor(Math.random() * xs.length)];
+        try {
+          data = JSON.stringify({lease: lease, data: data});  
+          ws.send(data);
+        } catch(e) {
+          this.promises.delete(lease);
+          promise.reject(Error("failed to send data in sync mode - protocol error: " + e));
+        }
+        
+        //init timeout
+        timer = setTimeout(this.timeoutPromise.bind(autobahn, lease), timeout ? timeout : this.syncTimeout);
+
+        promiseWrapper.timer = timer;
+      }
+      return promise;      
+    };
+
+    /**
+     * send message related to a topic without getting a promise to receive an answer. incomming messages containing a topic are multiplexed by the message bus in sync manner to all observers.
+     *
+     * Throws Error if autobahn is in wrong global state or no websocket is currently open
+     */
+    this.async = function(topic, data) {
+      if(this.state() == States.CLOSED) {
+        throw Error("failed to send data in sync mode - autobahn is closed.");
+      }
 
       //get some ws
       var xs = this.websockets.filter(function(x) {
@@ -290,23 +405,26 @@
       });
       if(xs.length == 0) {
         this.promises.delete(lease);
-        promise.reject(Error("failed to send data in sync mode - autobahn is closed."));
+        throw Error("failed to send data in sync mode - autobahn is closed.");
       }
       var ws = xs[Math.floor(Math.random() * xs.length)];
       try {
-        data = JSON.stringify({lease: lease, data: data});  
+        data = JSON.stringify({topic: topic, data: data});  
         ws.send(data);
       } catch(e) {
-        this.promises.delete(lease);
-        promise.reject(Error("failed to send data in sync mode - protocol error: " + e));
+        throw Error("failed to send data in sync mode - protocol error: " + e);
       }
-      
-      //init timeout
-      timer = setTimeout(this.timeoutPromise.bind(autobahn, lease), timeout ? timeout : this.syncTimeout);
+    }
 
-      promiseWrapper.timer = timer;
-      return promise;      
-    };
+    this.sub = function(topic, λ) {
+      return this.mbus.sub(topic, λ);
+    }
+
+    /** desubscribe from a topic, λid denotes the unique identifier of the observer */
+    this.desub = function(topic, λid) {
+      this.mbus.desub(topic, λid);
+    }
+
   }
   return Autobahn;
 });
