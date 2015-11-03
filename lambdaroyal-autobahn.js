@@ -92,11 +92,11 @@
     this.pub = function(topic, msg) {
       var observers = this.topics.get(topic);
       if(observers !== undefined) {
-        for(var x of observers.values()) {
+        observers.forEach(function(v,k) {
           try {
-            x(msg);
+            v(msg);
           } catch(e) {}
-        }
+        });
       }
     }
   }
