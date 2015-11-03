@@ -13,6 +13,12 @@ Furthermore one can send-off messages using a *topic* and receive answers to the
 
 ## How to use
 
+### Install
+
+```
+bower install lambdaroyal-autobahn
+```
+
 ### Initialize
 
 One websocket, no callbacks on state transitions
