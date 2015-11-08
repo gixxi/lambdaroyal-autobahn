@@ -24,6 +24,34 @@ QUnit.test( "testing lambdaroyal-autobahn, sync, plain vanilla", function( asser
   }, 1000);
 });
 
+QUnit.test( "testing lambdaroyal-autobahn, sync, send object data", function( assert ) {
+  var done = assert.async(2);
+  var autobahn = new Autobahn("ws://echo.websocket.org", {stateCallback: function(state) {
+    console.log("[custom autobahn] transiate to state " + state);
+    if(state === this.States.OPEN) {
+      autobahn.sync({data: "foo", event: "search"}).then(function(data) {
+        console.log("received message in time: " + data);
+        assert.ok(data.lease !== undefined);
+        assert.equal(data.data,"foo");
+        assert.equal(data.event,"search");
+        assert.equal(autobahn.promises.size, 0, "lease queue must be empty");
+        assert.equal(autobahn.state(), autobahn.States.OPEN);
+        
+        //close the autobahn
+        autobahn.close();
+        done();
+
+      });
+    }
+  }});
+
+  setTimeout(function() {
+    assert.equal(autobahn.state(), autobahn.States.OUTOFSERVICE);
+    done();
+  }, 1000);
+});
+
+
 QUnit.test( "testing lambdaroyal-autobahn, sync, do 100 calls on 4 lanes", function( assert ) {
   //init 4 connections and send off 100 incs
   var acc = 0;
