@@ -374,7 +374,14 @@
         }
         var ws = xs[Math.floor(Math.random() * xs.length)];
         try {
-          data = JSON.stringify({lease: lease, data: data});  
+
+          if(typeof data === "object") {
+            data["lease"] = lease;
+          } else {
+            data = {lease: lease, data: data};
+          }
+
+          data = JSON.stringify(data);  
           ws.send(data);
         } catch(e) {
           this.promises.delete(lease);
