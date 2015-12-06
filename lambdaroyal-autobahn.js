@@ -65,23 +65,23 @@
 
     /** returns a unique identifier for this observer related to the topic.
         use this identifier to unsubscribe from the topic */
-    this.sub = function(topic, λ) {
+    this.sub = function(topic, lambda) {
       var observers = this.topics.get(topic);
       if(observers === undefined) {
         observers = new Map();
         this.topics.set(topic, observers);
       }
 
-      var λid = _id();
-      observers.set(λid, λ);
-      return λid;
+      var lambdaid = _id();
+      observers.set(lambdaid, lambda);
+      return lambdaid;
     }
 
-    /** desubscribe from a topic, λid denotes the unique identifier of the observer */
-    this.desub = function(topic, λid) {
+    /** desubscribe from a topic, lambdaid denotes the unique identifier of the observer */
+    this.desub = function(topic, lambdaid) {
       var observers = this.topics.get(topic);
       if(observers !== undefined) {
-        observers.delete(λid);
+        observers.delete(lambdaid);
         if(observers.size == 0) {
           this.topics.delete(topic);
         }
@@ -423,13 +423,13 @@
       }
     }
 
-    this.sub = function(topic, λ) {
-      return this.mbus.sub(topic, λ);
+    this.sub = function(topic, lambda) {
+      return this.mbus.sub(topic, lambda);
     }
 
-    /** desubscribe from a topic, λid denotes the unique identifier of the observer */
-    this.desub = function(topic, λid) {
-      this.mbus.desub(topic, λid);
+    /** desubscribe from a topic, lambdaid denotes the unique identifier of the observer */
+    this.desub = function(topic, lambdaid) {
+      this.mbus.desub(topic, lambdaid);
     }
 
   }
