@@ -12,7 +12,7 @@
     "globals",
     "node"
   ],
-  "license": "GPLv3",
+  "license": "FreeBSD License",
   "ignore": [
     "**/.*",
     "node_modules",
