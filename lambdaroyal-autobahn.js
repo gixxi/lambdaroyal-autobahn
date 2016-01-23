@@ -132,7 +132,13 @@
       /**gets called when the global state changes*/
       stateCallback: function(state) {
         console.log("[autobahn " + this.sessionId + "] transiate to state " + state);
-      }
+      },
+      /**gets called when an uncatched exception occurs during maintenance phase or when opening a websocket that would otherwise only result in a console log.*/
+      exceptionCallback: function(err) {
+        console.log("uncatched exception occured: " + err);
+      },
+      /**gets called when responses on sync comm requests are received, [ws] denotes the websocket instance the response came in, [delay] denotes time in ms since request was spawned or undefined for responses that arrived after timeout*/
+      statsOnSyncResponse: function(ws, delay) {}
     }
     if (!options) { options = {}; }
 
@@ -166,6 +172,7 @@
     this.websockets = [];
 
     this.registerWebsocket = function(ws) {
+      ws["lane"] = this.websockets.length;
       this.websockets.push(ws);
     }
 
@@ -188,7 +195,7 @@
 
     this.promises = new Map();
 
-    this.resolvePromise = function(evt) {
+    this.resolvePromise = function(ws, evt) {
       if(evt.data !== undefined) {
         var data = evt.data;
         
@@ -201,8 +208,19 @@
           if(promise) {
             clearTimeout(promise.timer);
             this.promises.delete(lease);
-            promise.resolve(data);
-            
+            try {
+              promise.resolve(data);
+            } finally {
+              if(this.statsOnSyncResponse) {
+                this.statsOnSyncResponse(ws, (+new Date) - promise.start);
+              }
+            }
+          } else {
+            //most propably timeout
+            if(this.statsOnSyncResponse) {
+              this.statsOnSyncResponse(ws, undefined);
+            }
+
           }
           return true;
         }
@@ -275,7 +293,7 @@
       }
       // -> chain of responsibility
       //do some sync stuff
-      if(!this.resolvePromise(evt)) {
+      if(!this.resolvePromise(ws, evt)) {
         //do some async stuff
         this.pub(evt);
       }
@@ -297,21 +315,30 @@
         ws.onmessage = this.onmessageWebsocket.bind(this, ws);
       } catch(e) {
         console.log("Failed to instantiate websocket for URL " + this.url + " due to error: " + e);
+        if(this.exceptionCallback) {
+          this.exceptionCallback(e);
+        }
       }
     }
 
     this.mtn = function() {
-      //keep those that are connected
-      this.websockets = this.websockets.filter(function(n) {
-        return n.readyState === WebSocket.CONNECTING || n.readyState === WebSocket.OPEN;
-      });
+      try {
+        //keep those that are connected
+        this.websockets = this.websockets.filter(function(n) {
+          return n.readyState === WebSocket.CONNECTING || n.readyState === WebSocket.OPEN;
+        });
 
-      //don't waste time on non-avail infrastructure
-      if(this.websockets.length < this.lanes) {
-        var initJustOne = this.websockets.length == 0;
-        for(var i = 0; i < this.lanes - this.websockets.length; i++) {
-          this.initWebsocket();
-          if(initJustOne) break;
+        //don't waste time on non-avail infrastructure
+        if(this.websockets.length < this.lanes) {
+          var initJustOne = this.websockets.length == 0;
+          for(var i = 0; i < this.lanes - this.websockets.length; i++) {
+            this.initWebsocket();
+            if(initJustOne) break;
+          }
+        }
+      } catch(err) {
+        if(this.exceptionCallback) {
+          this.exceptionCallback(err);
         }
       }
     }
@@ -388,6 +415,9 @@
           promise.reject(Error("failed to send data in sync mode - protocol error: " + e));
         }
         
+        //set start POT
+        promiseWrapper.start = +new Date;
+
         //init timeout
         timer = setTimeout(this.timeoutPromise.bind(autobahn, lease), timeout ? timeout : this.syncTimeout);
 
@@ -403,7 +433,7 @@
      */
     this.async = function(topic, data) {
       if(this.state() == States.CLOSED) {
-        throw Error("failed to send data in sync mode - autobahn is closed.");
+        throw Error("failed to send data in async mode - autobahn is closed.");
       }
 
       //get some ws
@@ -411,8 +441,7 @@
         return x.readyState == WebSocket.OPEN;
       });
       if(xs.length == 0) {
-        this.promises.delete(lease);
-        throw Error("failed to send data in sync mode - autobahn is closed.");
+        throw Error("failed to send data in async mode - autobahn is closed.");
       }
       var ws = xs[Math.floor(Math.random() * xs.length)];
       try {

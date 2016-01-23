@@ -117,10 +117,10 @@ QUnit.test( "testing lambdaroyal-autobahn, async, do 100 calls on 4 lanes", func
       //subscribe
       autobahn.sub("foo", function(data) {
         acc = acc + data.data;
-        });
+      });
       autobahn.sub("boo", function(data) {
         acc = acc + data.data;
-        });
+      });
       //subscribe and desubscribe to check if garbage gets dumped
       autobahn.desub("boo", autobahn.sub("boo", function(data) {
         acc = acc + data.data;
@@ -152,4 +152,49 @@ QUnit.test( "testing lambdaroyal-autobahn, async, do 100 calls on 4 lanes", func
     done();
   }, 2000);
 });
+
+
+QUnit.test( "testing lambdaroyal-autobahn, sync, do 100 calls on 4 lanes, cummulate delays using the new statsOnSyncResponse callback.", function( assert ) {
+  //init 4 connections and send off 100 incs
+  var acc = 0;
+  var accDelay = 0;
+  var done = assert.async(3);
+  var autobahn = new Autobahn("ws://echo.websocket.org", {lanes: 4, maintainanceInterval: 100, stateCallback: function(state) {
+    console.log("[custom autobahn #2] transiate to state " + state);
+  },
+                                                          statsOnSyncResponse : function(ws, delay) {
+                                                            if(delay) {
+                                                              accDelay = accDelay + delay;
+                                                            }
+                                                          }});
+
+  //wait 1.1 seconds to have all open
+  setTimeout(function() {
+    assert.equal(autobahn.websockets.length, 4, "number of websockets must be four");
+    if(autobahn.state() === autobahn.States.OPEN) {
+      for(var i = 0; i < 100; i++) {
+        autobahn.sync(1).then(function(data) {
+          acc = acc + data.data;
+        });
+      }
+    }
+    done();
+  },1000);
+
+  //close the autobahn
+  setTimeout(function() {
+    autobahn.close();
+    done();
+  }, 2000);
+
+  
+  //check postconditions
+  setTimeout(function() {
+    assert.equal(autobahn.state(), autobahn.States.OUTOFSERVICE,"autobahn must be out-of-service after close");
+    assert.equal(acc, 100, "accumulator must be 100 due to 100 increments");
+    assert.ok(accDelay > 0, "statsOnSyncResponse callback must have been called");
+    done();
+  }, 2500);
+});
+
 
