@@ -129,6 +129,10 @@
       maintainanceInterval: 2000,
       /**name(s) of the protocol used to initialize individual websockets*/
       protocols: "vlic",
+      /**gets called when sync timeout occcures, can be used to inform log servers to get some failure stats*/
+      syncErrorCallback: function(lease) {
+        
+      },
       /**gets called when the global state changes*/
       stateCallback: function(state) {
         console.log("[autobahn " + this.sessionId + "] transiate to state " + state);
@@ -191,7 +195,8 @@
       }
     } 
 
-    this.initData = access({sessionId: this.sessionId}, this.sendInitData.bind(this));
+    //we send-in the number of lanes to allow the server to kill-off broken daemon lanes from server side 
+    this.initData = access({sessionId: this.sessionId, lanes: this.lanes}, this.sendInitData.bind(this));
 
     this.promises = new Map();
 
@@ -249,7 +254,10 @@
       var promise = this.promises.get(lease);
       if(promise) {
         this.promises.delete(lease);
-        promise.reject(Error("failed to receive data for lease " + lease + " in time"))
+        if(this.syncErrorCallback) {
+          this.syncErrorCallback(lease);
+        }
+        promise.reject(Error("failed to receive data for lease " + lease + " in time"));
       }      
     };
 
