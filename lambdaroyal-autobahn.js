@@ -358,7 +358,7 @@
       clearInterval(this.mtnTimer);
       //keep those that are connected
       this.websockets = this.websockets.filter(function(n) {
-        return n.readyState === n.readyState === WebSocket.OPEN;
+        return n.readyState === WebSocket.OPEN;
       });
 
       this.websockets.map(function(n) {
