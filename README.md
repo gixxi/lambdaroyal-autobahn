@@ -95,3 +95,5 @@ init parameters are provided to the new instance as a Javascript Map. The follow
 * **stateCallback** gets called when the global state changes
 * **exceptionCallback** gets called when an uncatched exception occurs during maintenance phase or when opening a websocket that would otherwise only result in a console log. the error message is passed to the function
 * **statsOnSyncResponse** gets called when responses on sync comm requests are received, accepts parameters ws and delay. [ws] denotes the websocket instance the response came in, [delay] denotes time in ms since request was spawned or undefined for responses that arrived after timeout
+* **syncStarts** (undefined) global callback that gets invoked right before a sync call is attempted to be sent via some websocket, the function can accept the request body as parameter
+* **syncStops** (undefined) global callback that gets invoked right after a sync call resolves or is rejected, the function can accept success as first and the response body as second parameter
