@@ -129,6 +129,14 @@
       maintainanceInterval: 2000,
       /**name(s) of the protocol used to initialize individual websockets*/
       protocols: "vlic",
+      /**
+       * global callback that gets invoked right before a sync call is attempted to be sent via some websocket, the function can accept the request body as parameter
+       */
+      syncStarts: undefined,
+      /**
+       * global callback that gets invoked right after a sync call resolves or is rejected, the function can accept success as first and the response body as second parameter
+       */
+      syncStops: undefined,
       /**gets called when sync timeout occcures, can be used to inform log servers to get some failure stats*/
       syncErrorCallback: function(lease) {
         
@@ -219,6 +227,13 @@
               if(this.statsOnSyncResponse) {
                 this.statsOnSyncResponse(ws, (+new Date) - promise.start);
               }
+              if(this.syncStops) {
+                try {
+                  this.syncStops(true, data);
+                } catch(e) {
+                  console.log("failed to invoke syncStops: " + e);
+                }
+              }
             }
           } else {
             //most propably timeout
@@ -254,6 +269,15 @@
       var promise = this.promises.get(lease);
       if(promise) {
         this.promises.delete(lease);
+
+        if(this.syncStops) {
+          try {
+            this.syncStops(false, lease);
+          } catch(e) {
+            console.log("failed to invoke syncStops: " + e);
+          }
+        }
+
         if(this.syncErrorCallback) {
           this.syncErrorCallback(lease);
         }
@@ -416,7 +440,16 @@
             data = {lease: lease, data: data};
           }
 
-          data = JSON.stringify(data);  
+          if(this.syncStarts) {
+            try {
+              this.syncStarts(data);
+            } catch(e) {
+              console.log("failed to invoke syncStart: " + e);
+            }
+          }
+
+          data = JSON.stringify(data);
+  
           ws.send(data);
         } catch(e) {
           this.promises.delete(lease);
