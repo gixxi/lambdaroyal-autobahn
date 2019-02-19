@@ -97,3 +97,21 @@ init parameters are provided to the new instance as a Javascript Map. The follow
 * **statsOnSyncResponse** gets called when responses on sync comm requests are received, accepts parameters ws and delay. [ws] denotes the websocket instance the response came in, [delay] denotes time in ms since request was spawned or undefined for responses that arrived after timeout
 * **syncStarts** (undefined) global callback that gets invoked right before a sync call is attempted to be sent via some websocket, the function can accept the request body as parameter
 * **syncStops** (undefined) global callback that gets invoked right after a sync call resolves or is rejected, the function can accept success as first and the response body as second parameter
+
+## Build
+
+get build dependencies
+
+> npm install
+
+minify
+
+> grunt
+
+prepare publish by login-in
+
+> npm adduser
+
+publish new version
+
+> npm publish

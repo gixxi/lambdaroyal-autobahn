@@ -78,7 +78,7 @@ QUnit.test( "testing lambdaroyal-autobahn, sync, do 100 calls on 4 lanes", funct
   
   //check postconditions
   setTimeout(function() {
-    assert.equal(autobahn.state(), autobahn.States.OUTOFSERVICE,"autobahn must be out-of-service after close");
+    assert.ok(autobahn.state() === autobahn.States.OUTOFSERVICE || autobahn.state() === autobahn.States.CLOSED, "autobahn must be out-of-service after close");
     assert.equal(acc, 100, "accumulator must be 100 due to 100 increments");
     done();
   }, 2000);

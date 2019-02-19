@@ -332,8 +332,15 @@
     }
 
     this.initWebsocket = function() {
-      //transiate global state 
-      if(this.state() === States.OUTOFSERVICE) this.state(States.CLOSED);
+      // transiate global state 
+      // check if at least one websocket (lane) is open
+      if(this.websockets.filter(function(n) {
+        return n.readyState === WebSocket.OPEN;
+      }).length == 0) {
+        this.state(States.CLOSED);
+      }
+
+
       try {
         if(this.debug) {
           console.log("[autobahn " + this.sessionId + "] init websocket to " + this.url);
