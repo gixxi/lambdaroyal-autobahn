@@ -1,7 +1,7 @@
 {
   "name": "lambdaroyal-autobahn",
   "main": "lambdaroyal-autobahn.js",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "homepage": "https://github.com/gixxi/lambdaroyal-autobahn",
   "authors": [
     "Christian Meichsner <christian.meichsner@live.com>"

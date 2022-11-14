@@ -42,9 +42,10 @@
   var access = function(store, callback) {
     var prop = function() {
       if (arguments.length) {
+        const oldStore = store;
         store = arguments[0];
         if(callback) {
-          callback(store);
+          callback(store, oldStore);
         }}
       return store;
     };
